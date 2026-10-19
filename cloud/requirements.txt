@@ -1,5 +1,5 @@
 flask>=3.0
-gunicorn>=22.0
+gunicorn>=26.2.0
 psycopg[binary,pool]>=3.2
 requests>=2.31
 matplotlib>=3.8
