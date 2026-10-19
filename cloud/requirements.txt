@@ -2,5 +2,5 @@ flask>=3.0
 gunicorn>=22.0
 psycopg[binary,pool]>=3.2
 requests>=2.31
-matplotlib>=3.8
+matplotlib>=3.11.2
 tzdata
