@@ -1,0 +1,16 @@
+[Unit]
+Description=Sleep monitor - upload readings to cloud
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/sleepmon
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/home/pi/sleepmon/cloud.env
+ExecStart=/home/pi/sleepenv/bin/python uploader.py
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

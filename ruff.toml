@@ -1,0 +1,10 @@
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "B", "S", "UP"]
+
+[lint.per-file-ignores]
+"dashboard.py" = ["S104"]        # LAN dashboard on the Pi must listen on all interfaces
+"cloud/app.py" = ["S104"]
+"uploader.py" = ["S310"]         # URL comes from our own config (https cloud endpoint)

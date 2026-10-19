@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sleep Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --text:#e6e6e6; --muted:#8a8f98; --accent:#5aa9e6; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; }
+  h1 { font-size:20px; margin:0; font-weight:600; }
+  .ranges button { background:var(--panel); color:var(--text); border:1px solid #2a2f3a; padding:6px 12px;
+                   border-radius:6px; cursor:pointer; margin-left:4px; }
+  .ranges button.active { border-color:var(--accent); color:var(--accent); }
+  main { padding:0 20px 20px; display:grid; gap:16px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; }
+  .card { background:var(--panel); border-radius:10px; padding:14px 16px; }
+  .card .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  .card .value { font-size:28px; font-weight:600; margin-top:4px; }
+  .card .unit { font-size:14px; color:var(--muted); margin-left:4px; }
+  .panel { background:var(--panel); border-radius:10px; padding:14px 16px; }
+  .panel h2 { font-size:14px; color:var(--muted); margin:0 0 8px; font-weight:500; }
+  .chart { position:relative; height:320px; }
+  .chart.small { height:220px; }
+  footer { color:var(--muted); font-size:12px; padding:0 20px 20px; }
+  footer a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sleep Monitor</h1>
+  <div class="ranges">
+    <button data-range="night">Last night</button>
+    <button data-range="3">3 h</button>
+    <button data-range="12" class="active">12 h</button>
+    <button data-range="24">24 h</button>
+    <button data-range="168">7 days</button>
+  </div>
+</header>
+
+<main>
+  <div class="cards">
+    <div class="card"><div class="label">CO₂ now</div><div class="value"><span id="now-co2">–</span><span class="unit">ppm</span></div></div>
+    <div class="card"><div class="label">Temperature</div><div class="value"><span id="now-temp">–</span><span class="unit">°C</span></div></div>
+    <div class="card"><div class="label">Humidity</div><div class="value"><span id="now-rh">–</span><span class="unit">%</span></div></div>
+    <div class="card"><div class="label">Last reading</div><div class="value" style="font-size:18px" id="now-ts">–</div></div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Average CO₂</div><div class="value"><span id="s-avg">–</span><span class="unit">ppm</span></div></div>
+    <div class="card"><div class="label">Peak CO₂</div><div class="value"><span id="s-max">–</span><span class="unit">ppm</span></div></div>
+    <div class="card"><div class="label">Time &gt; 1000 ppm</div><div class="value"><span id="s-1000">–</span></div></div>
+    <div class="card"><div class="label">Time &gt; 1400 ppm</div><div class="value"><span id="s-1400">–</span></div></div>
+  </div>
+
+  <div class="panel">
+    <h2>CO₂ (ppm)</h2>
+    <div class="chart"><canvas id="co2Chart"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <h2>Temperature &amp; humidity</h2>
+    <div class="chart small"><canvas id="envChart"></canvas></div>
+  </div>
+</main>
+
+<footer>
+  Bands: green &lt; 800 · yellow 800–1000 · orange 1000–1400 · red &gt; 1400 ppm ·
+  <a id="csv" href="#">Download CSV</a>
+</footer>
+
+<script>
+const BANDS = [
+  { from: 0,    to: 800,   color: "rgba(76,175,80,0.10)" },
+  { from: 800,  to: 1000,  color: "rgba(255,235,59,0.10)" },
+  { from: 1000, to: 1400,  color: "rgba(255,152,0,0.12)" },
+  { from: 1400, to: 10000, color: "rgba(244,67,54,0.14)" },
+];
+
+const bandsPlugin = {
+  id: "co2Bands",
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea: a, scales: { y } } = chart;
+    ctx.save();
+    for (const b of BANDS) {
+      const top = Math.max(y.getPixelForValue(b.to), a.top);
+      const bottom = Math.min(y.getPixelForValue(b.from), a.bottom);
+      if (bottom > top) {
+        ctx.fillStyle = b.color;
+        ctx.fillRect(a.left, top, a.right - a.left, bottom - top);
+      }
+    }
+    ctx.restore();
+  },
+};
+
+Chart.defaults.color = "#8a8f98";
+Chart.defaults.borderColor = "#2a2f3a";
+
+const timeAxis = {
+  type: "time",
+  ticks: { maxTicksLimit: 12, maxRotation: 0 },
+  time: { tooltipFormat: "EEE HH:mm", displayFormats: { minute: "HH:mm", hour: "HH:mm", day: "EEE d" } },
+};
+
+const co2Chart = new Chart(document.getElementById("co2Chart"), {
+  type: "line",
+  data: { datasets: [{ label: "CO₂", data: [], borderColor: "#5aa9e6", borderWidth: 1.5, pointRadius: 0, spanGaps: false }] },
+  options: {
+    animation: false, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+    scales: { x: timeAxis, y: { suggestedMin: 400, suggestedMax: 1200 } },
+    plugins: { legend: { display: false } },
+  },
+  plugins: [bandsPlugin],
+});
+
+const envChart = new Chart(document.getElementById("envChart"), {
+  type: "line",
+  data: { datasets: [
+    { label: "Temperature °C", data: [], borderColor: "#ef8354", borderWidth: 1.5, pointRadius: 0, yAxisID: "t" },
+    { label: "Humidity %",     data: [], borderColor: "#7bc8a4", borderWidth: 1.5, pointRadius: 0, yAxisID: "h" },
+  ] },
+  options: {
+    animation: false, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+    scales: {
+      x: timeAxis,
+      t: { position: "left",  title: { display: true, text: "°C" } },
+      h: { position: "right", title: { display: true, text: "%" }, grid: { drawOnChartArea: false } },
+    },
+  },
+});
+
+let currentRange = "12";
+
+function rangeBounds(range) {
+  const now = new Date();
+  if (range === "night") {
+    const end = new Date(now); end.setHours(10, 0, 0, 0);
+    const start = new Date(now); start.setDate(start.getDate() - 1); start.setHours(20, 0, 0, 0);
+    return [Math.floor(start / 1000), Math.floor(Math.min(end, now) / 1000)];
+  }
+  const to = Math.floor(now / 1000);
+  return [to - Number(range) * 3600, to];
+}
+
+function withGaps(points, bucket, pick) {
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    if (i > 0 && points[i][0] - points[i - 1][0] > bucket * 3) out.push({ x: (points[i - 1][0] + bucket) * 1000, y: null });
+    out.push({ x: points[i][0] * 1000, y: pick(points[i]) });
+  }
+  return out;
+}
+
+function fmtMinutes(m) {
+  if (m == null) return "–";
+  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+}
+
+async function loadLatest() {
+  const r = await fetch("/api/latest").then(r => r.json());
+  if (!r) return;
+  document.getElementById("now-co2").textContent = r.co2;
+  document.getElementById("now-temp").textContent = r.temp.toFixed(1);
+  document.getElementById("now-rh").textContent = r.rh.toFixed(0);
+  const age = Math.round(Date.now() / 1000 - r.ts);
+  document.getElementById("now-ts").textContent =
+    new Date(r.ts * 1000).toLocaleTimeString() + (age > 60 ? ` (${Math.round(age / 60)} min ago!)` : "");
+}
+
+async function loadSeries() {
+  const [from, to] = rangeBounds(currentRange);
+  const d = await fetch(`/api/co2?from=${from}&to=${to}`).then(r => r.json());
+  co2Chart.data.datasets[0].data = withGaps(d.points, d.bucket_s, p => p[1]);
+  envChart.data.datasets[0].data = withGaps(d.points, d.bucket_s, p => p[2]);
+  envChart.data.datasets[1].data = withGaps(d.points, d.bucket_s, p => p[3]);
+  for (const c of [co2Chart, envChart]) {
+    c.options.scales.x.min = from * 1000;
+    c.options.scales.x.max = to * 1000;
+    c.update();
+  }
+  const s = d.stats;
+  document.getElementById("s-avg").textContent = s.co2_avg ?? "–";
+  document.getElementById("s-max").textContent = s.co2_max ?? "–";
+  document.getElementById("s-1000").textContent = s.samples ? fmtMinutes(s.min_over_1000) : "–";
+  document.getElementById("s-1400").textContent = s.samples ? fmtMinutes(s.min_over_1400) : "–";
+  document.getElementById("csv").href = `/api/co2.csv?from=${from}&to=${to}`;
+}
+
+function refresh() { loadLatest(); loadSeries(); }
+
+document.querySelectorAll(".ranges button").forEach(btn => btn.addEventListener("click", () => {
+  document.querySelectorAll(".ranges button").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  currentRange = btn.dataset.range;
+  loadSeries();
+}));
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

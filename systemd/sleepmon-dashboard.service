@@ -1,0 +1,15 @@
+[Unit]
+Description=Sleep monitor - web dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/sleepmon
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/pi/sleepenv/bin/python dashboard.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

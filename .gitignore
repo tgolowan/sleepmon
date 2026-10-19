@@ -1,0 +1,22 @@
+# Secrets (Pi upload token, local env files)
+cloud.env
+.env
+.env.*
+
+# Runtime data
+*.db
+*.db-wal
+*.db-shm
+*.wav
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,16 @@
+[Unit]
+Description=Sleep monitor - SCD41 CO2 logger
+After=multi-user.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/sleepmon
+Environment=PYTHONUNBUFFERED=1
+# Environment=SLEEPMON_ALTITUDE_M=100
+# Environment=SLEEPMON_TEMP_OFFSET_C=4
+ExecStart=/home/pi/sleepenv/bin/python co2_logger.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
