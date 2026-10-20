@@ -1,4 +1,5 @@
 import io
+import math
 from datetime import datetime
 
 import matplotlib
@@ -29,7 +30,7 @@ def co2_chart(points, bucket_s, tz, title):
         ys.append(p["co2"])
 
     fig, ax = plt.subplots(figsize=(10, 4.5), dpi=110)
-    top = max(1200, max(y for y in ys if y == y) + 100)
+    top = max(1200, max(y for y in ys if not math.isnan(y)) + 100)
     for lo, hi, color in BANDS:
         ax.axhspan(lo, min(hi, top), color=color, alpha=0.12, linewidth=0)
     ax.plot(xs, ys, color="#1f77b4", linewidth=1.4)

@@ -1,5 +1,6 @@
 """Reads the SCD41 every 5 s and stores readings in SQLite."""
 
+import contextlib
 import logging
 import os
 import signal
@@ -78,10 +79,8 @@ def main():
         conn.commit()
         log.debug("CO2 %d ppm  T %.1f °C  RH %.1f %%", co2, temp, rh)
 
-    try:
+    with contextlib.suppress(OSError):
         sensor.stop()
-    except OSError:
-        pass
     sensor.close()
     conn.close()
     log.info("stopped")
