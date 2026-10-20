@@ -1,21 +1,18 @@
 name: codeql
 
-# Private repos need GitHub Code Security for CodeQL. Once it is enabled, set the
-# repository variable CODEQL_ENABLED=true (Settings → Secrets and variables → Actions → Variables).
-
 on:
   push:
     branches: [main]
   pull_request:
   schedule:
     - cron: "17 4 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   analyze:
-    if: vars.CODEQL_ENABLED == 'true'
     name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
